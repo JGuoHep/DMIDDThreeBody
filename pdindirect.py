@@ -5,11 +5,14 @@ from scipy.interpolate import interp1d
 from scipy.integrate import quad
 from scipy.optimize import brute, fmin, minimize_scalar
 from scipy.special import gammainc
+import os
 
 jfactor_path = "/home/jguo/workspace/data/Fermi_Data/"
 
-# dwarves_list = ['coma_berenices', 'draco', 'segue_1', 'ursa_major_II', 'ursa_minor', 'reticulum_II' ]
-dwarves_list = ['draco' ]
+dwarves_list = ['carina', 'draco', 'fornax','leo_I','leo_II','sculptor','sextans',
+                 'ursa_minor', 'bootes_I', 'canes_venatici_II', 'coma_berenices', 
+                 'hercules', 'segue_1', 'ursa_major_II', 'willman_1']
+# dwarves_list = ['coma_berenices', 'draco']
 
 
 class WhiteDWarfs():
@@ -78,9 +81,9 @@ class FermiPvalue():
         '''Get the dn/de of certain E, return a function object calculating e * dn/de.'''
         energy = self.spectrum[0]
         dnde = self.spectrum[1]
-        logfspectrum = interp1d(np.log(energy), np.log(dnde))
+        logfspectrum = interp1d(np.log10(energy), np.log10(dnde))
         if (e<energy.max() and e>energy.min()):
-            return np.exp(logfspectrum(np.log(e)))* e  # np.exp(logfspectrum(np.log(e)))[0] * e
+            return np.power(10, logfspectrum(np.log10(e)))* e  # np.exp(logfspectrum(np.log(e)))[0] * e
         else:
             return 0.0
 
@@ -102,21 +105,21 @@ class FermiPvalue():
         bin_up = self.whitedwarfs[0]["ll_table"][:, 1]  # get the energy bins from first dwarf likelihood table.
         bin_up = np.array(list(set(bin_up)))*1e-3
         bin_up = np.sort(bin_up)
-        predict_fluxes = [quad(self.espectrum_e, down, up) for down, up in zip(bin_down, bin_up)]
+        tol = min(self.espectrum_e(1e2),self.espectrum_e(1e5))*1e-10
+        predict_fluxes = [quad(self.espectrum_e, down, up, epsabs=tol)[0] for down, up in zip(bin_down, bin_up)]
         predict_fluxes = np.array(predict_fluxes)
         predict_fluxes = predict_fluxes * self.sigmav0 * self.j0 / (4 * 2 * np.pi * self.mdm**2)
         predict_fluxes = predict_fluxes * (sigmav/self.sigmav0)
         return predict_fluxes
 
-    def _dwraf_likelihood(self, dwarf, sigmav):
+    def _dwraf_likelihood(self, dwarf, predict_fluxes):
         """Get the log likelihood of one dwarf."""
-        predict_fluxes = self.get_predict_fluxes(sigmav)
         j = dwarf['mu_j']
         sigma_j = dwarf['sigma_j']
         ll_table = dwarf["ll_table"]
         n_bin = len(set(ll_table[:, 0]))
         flux2ll = ll_table[:, 2:].reshape([n_bin, -1, 2])
-        flux2ll_funcs = [interp1d(flux2ll[i][:, 0] *1e-3, flux2ll[i][:, 1]) for i in range(n_bin)]
+        flux2ll_funcs = [interp1d(flux2ll[i][:, 0] *1e-3, flux2ll[i][:, 1], bounds_error=False, fill_value=-1e5) for i in range(n_bin)]
         def likeli(x):
             fluxes = predict_fluxes * 10**(j+x*sigma_j)/self.j0
             likeli_flux = np.array([func(flux) for func, flux in zip(flux2ll_funcs, fluxes)]).sum()
@@ -132,10 +135,11 @@ class FermiPvalue():
         """Get the combiine dwarfs loglikelihoods, including predict
         likelihood and null likelihood.
         """
+        predict_fluxes = self.get_predict_fluxes(sigmav)
         dwarfs = self.whitedwarfs
         likelihoods = []
         for dwarf in dwarfs:
-            likelihood = self._dwraf_likelihood(dwarf, sigmav)
+            likelihood = self._dwraf_likelihood(dwarf, predict_fluxes)
             likelihoods.append(likelihood)
         likelihoods = np.array(likelihoods)
         likelihoods = np.sum(likelihoods, axis=0)
@@ -167,12 +171,12 @@ class GetExcluding():
             return self.loss(fermip, sigmav)
         logsigmav_min = np.log10(self.sigmavrange)[0]
         logsigmav_max = np.log10(self.sigmavrange)[1]
-        n_steps = int(10 * (logsigmav_max - logsigmav_min))
+        n_steps = int(5 * (logsigmav_max - logsigmav_min))
         search = brute(loss_fn, [(logsigmav_min,logsigmav_max)], Ns=n_steps, full_output=False, finish=fmin)
         print(search[0])
         sigmav_ul = np.power(10, search[0])
         print("cls predict: ", fermip.dwarfs_likelihood(sigmav_ul))
-        print("cls predict 2: ", fermip.dwarfs_likelihood(1e-27))
+        print("cls predict 2: ", fermip.get_predict_fluxes(0))
         return sigmav_ul
 
     def get_excluding_line(self, mrange):
@@ -193,13 +197,25 @@ class GetExcluding():
 
 
 if __name__ == '__main__':
-    cls = 0.95
-    spectrum_path = "./gammas_spectrum_pythia8.dat"
-    mrange = np.array([335, 340])
+    cls = 0.9
+    mmin = 130
+    mmax = 10000
+    spectrum_path = "./gammas_spectrum.dat"
+    step = (np.log10(mmax) - np.log10(mmin))/20.
+    mrange = np.arange(np.log10(mmin), np.log10(mmax), step)
+    print(mrange)
     sigmavrange = np.array([1e-28, 1e-24])
-    excluding = GetExcluding(sigmavrange, spectrum_path, cls)
-    excluding_line = excluding.get_excluding_line(mrange)
-    print(excluding_line)
+    result_f = open('result.txt', 'a')
+    # excluding_line = excluding.get_excluding_line(mrange)
+    for logmdm in mrange:
+        mdm = np.power(10, logmdm)
+        print("mdm: ", mdm)
+        command = "./spectrummc {}".format(mdm)
+        os.system(command)
+        excluding = GetExcluding(sigmavrange, spectrum_path, cls)
+        sigmav_ul = excluding.get_excluding_point(mdm)
+        result_f.write("{}     {}\r".format(mdm, sigmav_ul))
+    result_f.close()
 
 
 
