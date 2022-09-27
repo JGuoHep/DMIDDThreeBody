@@ -35,16 +35,16 @@ ifeq (,$(main))
 endif
 
 ########################pythia part#########################
-PREFIX_BIN=/home/jguo/workspace/pythia8303/bin
-PREFIX_INCLUDE=/home/jguo/workspace/pythia8303/include
-PREFIX_LIB=/home/jguo/workspace/pythia8303/lib
-PREFIX_SHARE=/home/jguo/workspace/pythia8303/share/Pythia8
+PREFIX_BIN=/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/pythia8/bin
+PREFIX_INCLUDE=/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/pythia8/include
+PREFIX_LIB=/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/pythia8/lib
+PREFIX_SHARE=/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/pythia8/share/Pythia8
 
-GZIP_BIN=/home/jguo/workspace/MG5_aMC_v2_9_3/HEPTools/zlib
-GZIP_INCLUDE=-I/home/jguo/workspace/MG5_aMC_v2_9_3/HEPTools/zlib/include
-GZIP_LIB=-L/home/jguo/workspace/MG5_aMC_v2_9_3/HEPTools/zlib/lib -Wl,-rpath,/home/jguo/workspace/MG5_aMC_v2_9_3/HEPTools/zlib/lib 
+GZIP_BIN=/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/zlib
+GZIP_INCLUDE=-I/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/zlib/include
+GZIP_LIB=-L/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/zlib/lib -Wl,-rpath,/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/zlib/lib 
 
-CXX_COMMON=-C -std=c++11 -pedantic -W -Wall -Wshadow -fPIC -DGZIP -I/home/jguo/workspace/MG5_aMC_v2_9_3/HEPTools/zlib/include
+CXX_COMMON=-C -std=c++11 -pedantic -W -Wall -Wshadow -fPIC -DGZIP -I/home/jguo/workspace/MG5_aMC_v3_4_1/HEPTools/zlib/include
 CXX_SHARED=-shared
 CXX_SONAME=-Wl,-soname,
 LIB_SUFFIX=.so
